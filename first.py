@@ -5,6 +5,7 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import SGD
 from tensorflow.keras.datasets import mnist
 from tensorflow.keras.utils import to_categorical
+
 # Load and preprocess data
 (X_train, Y_train), (X_test, Y_test) = mnist.load_data()
 X_train, X_test = X_train.reshape(-1, 784) / 255.0, X_test.reshape(-1, 784) / 255.0

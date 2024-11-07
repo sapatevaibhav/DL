@@ -1,39 +1,47 @@
 import tensorflow as tf
-from tensorflow.keras import layers, models
-from tensorflow.keras.datasets import mnist
+from tensorflow import keras
+from keras import layers,models
 import numpy as np
-import matplotlib.pyplot as plt
 
-# Step b: Load and preprocess the dataset (MNIST for simplicity)
-(x_train, _), (x_test, _) = mnist.load_data()
-x_train, x_test = x_train / 255.0, x_test / 255.0  # Normalize images
-x_train = np.reshape(x_train, (x_train.shape[0], 28, 28, 1))  # Reshape for CNNs
-x_test = np.reshape(x_test, (x_test.shape[0], 28, 28, 1))
+(x_train,y_train),(x_test,y_test)=tf.keras.datasets.mnist.load_data();
 
-# Step c: Build the Encoder-Decoder (Autoencoder) Model
-input_img = layers.Input(shape=(28, 28, 1))
+x_test=x_test/255
+x_train=x_train/255
 
-# Encoder
-x = layers.Conv2D(32, (3, 3), activation='relu', padding='same')(input_img)
-x = layers.MaxPooling2D((2, 2), padding='same')(x)
-x = layers.Conv2D(64, (3, 3), activation='relu', padding='same')(x)
-encoded = layers.MaxPooling2D((2, 2), padding='same')(x)
+x_train = x_train.reshape((-1, 28, 28, 1))
+x_test = x_test.reshape((-1, 28, 28, 1))
 
-# Decoder
-x = layers.Conv2DTranspose(64, (3, 3), activation='relu', padding='same')(encoded)
-x = layers.UpSampling2D((2, 2))(x)
-x = layers.Conv2DTranspose(32, (3, 3), activation='relu', padding='same')(x)
-decoded = layers.UpSampling2D((2, 2))(x)
-decoded = layers.Conv2DTranspose(1, (3, 3), activation='sigmoid', padding='same')(decoded)
+#create encoder
+encoder=models.Sequential([
+    layers.Input(shape=(28,28,1)),
+    layers.Conv2D(32,(3,3),activation='relu',padding='same'),
+    layers.MaxPooling2D(2,2),
+    layers.Conv2D(64,(3,3),activation='relu',padding='same'),
+    layers.MaxPooling2D(2,2),
 
-# Model
-autoencoder = models.Model(input_img, decoded)
+])
 
-# Step e: Compile the model
-autoencoder.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+#decoder
+decoder=models.Sequential([
+    layers.Conv2DTranspose(64,(3,3),activation="relu", input_shape=(7,7,64),padding='same'),
+    layers.UpSampling2D((2,2)),
+    layers.Conv2DTranspose(32,(3,3),activation='relu',padding='same'),
+    layers.UpSampling2D((2,2)),
+    layers.Conv2DTranspose(1,(3,3),activation='sigmoid',padding='same')
+])
 
-# Step d: Train the model and capture the training history
-history = autoencoder.fit(x_train, x_train, epochs=10, batch_size=128, validation_data=(x_test, x_test))
+#crete autoencoder
+autoencoder=models.Sequential([encoder,decoder])
+
+#compile
+autoencoder.compile(
+    optimizer='adam',
+    loss='binary_crossentropy',
+    metrics=['accuracy']
+)
+
+#train
+h=autoencoder.fit(x_train,x_train,validation_data=(x_test,x_test),epochs=2,batch_size=128)
 
 # Anomaly detection: Compare reconstruction error to detect anomalies
 decoded_imgs = autoencoder.predict(x_test)
@@ -42,12 +50,3 @@ threshold = np.percentile(reconstruction_error, 95)  # Set threshold for anomaly
 anomalies = reconstruction_error > threshold
 
 print(f"Detected {np.sum(anomalies)} anomalies out of {len(anomalies)} test samples.")
-
-
-# Plot the loss curves for training and validation
-plt.plot(history.history['loss'], label='Training Loss')
-plt.plot(history.history['val_loss'], label='Validation Loss')
-plt.xlabel('Epochs')
-plt.ylabel('Loss')
-plt.legend()
-plt.show()
