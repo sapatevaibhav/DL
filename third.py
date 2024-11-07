@@ -35,6 +35,15 @@ autoencoder.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accu
 # Step d: Train the model and capture the training history
 history = autoencoder.fit(x_train, x_train, epochs=10, batch_size=128, validation_data=(x_test, x_test))
 
+# Anomaly detection: Compare reconstruction error to detect anomalies
+decoded_imgs = autoencoder.predict(x_test)
+reconstruction_error = np.mean(np.abs(decoded_imgs - x_test), axis=(1, 2, 3))
+threshold = np.percentile(reconstruction_error, 95)  # Set threshold for anomaly detection
+anomalies = reconstruction_error > threshold
+
+print(f"Detected {np.sum(anomalies)} anomalies out of {len(anomalies)} test samples.")
+
+
 # Plot the loss curves for training and validation
 plt.plot(history.history['loss'], label='Training Loss')
 plt.plot(history.history['val_loss'], label='Validation Loss')
