@@ -1,51 +1,61 @@
 import numpy as np
-from sklearn.preprocessing import OneHotEncoder
 
-# Sample corpus and parameters
-corpus = ["I like machine learning", "I enjoy deep", "Coding is fascinating"]
-window_size, embedding_dim, lr, epochs = 2, 5, 0.01, 100
+# Prepare data with context weighting
+def prepare_data(corpus, window_size):
+    words = ' '.join(corpus).split()
+    vocab = list(set(words))
+    word_to_idx = {word: idx for idx, word in enumerate(vocab)}
+    idx_to_word = {idx: word for word, idx in word_to_idx.items()}
 
-# Preprocessing: Tokenize and create vocabulary
-words = [word for sentence in corpus for word in sentence.lower().split()]
-vocab = sorted(set(words))
-word_to_index = {word: idx for idx, word in enumerate(vocab)}
-index_to_word = {idx: word for word, idx in word_to_index.items()}
-
-# One-hot encoding
-encoder = OneHotEncoder(sparse=False)
-one_hot_matrix = encoder.fit_transform(np.array(vocab).reshape(-1, 1))
-
-# Generate training data
-def generate_training_data(words, window_size):
     X, y = [], []
     for i in range(window_size, len(words) - window_size):
-        context = words[i - window_size:i] + words[i + 1:i + window_size + 1]
-        target = words[i]
-        X.append(sum(one_hot_matrix[word_to_index[w]] for w in context))
-        y.append(one_hot_matrix[word_to_index[target]])
-    return np.array(X), np.array(y)
+        context = [word_to_idx[words[i+j]] for j in range(-window_size, window_size+1) if j != 0]
+        target = word_to_idx[words[i]]
+        X.append(context)
+        y.append(target)
+    return np.array(X), np.array(y), word_to_idx, idx_to_word
 
-X_train, y_train = generate_training_data(words, window_size)
+# CBOW Model with weighted context
+class CBOW:
+    def __init__(self, vocab_size, embed_dim):
+        self.W1 = np.random.randn(vocab_size, embed_dim)
+        self.W2 = np.random.randn(embed_dim, vocab_size)
 
-# Model parameters and layers
-W1, W2 = np.random.rand(len(vocab), embedding_dim), np.random.rand(embedding_dim, len(vocab))
+    def forward(self, X, weights):
+        # Compute the weighted average embedding for context words
+        context_embeddings = self.W1[X] * weights[:, np.newaxis]
+        hidden = np.sum(context_embeddings, axis=0) / np.sum(weights)  # Weighted average
+        out = hidden @ self.W2
+        softmax = np.exp(out) / np.sum(np.exp(out))
+        return softmax, hidden
 
-# Training the CBOW model
-for _ in range(epochs):
-    for x, target in zip(X_train, y_train):
-        h, u = np.dot(x, W1), np.dot(np.dot(x, W1), W2)
-        y_pred = np.exp(u) / np.sum(np.exp(u))
-        e = y_pred - target
-        W2 -= lr * np.outer(h, e)
-        W1 -= lr * np.outer(x, np.dot(W2, e))
+    def train(self, X, y, lr=0.01, epochs=5000):
+        for _ in range(epochs):
+            for i in range(len(y)):
+                # Use proximity-based weights for context words
+                context_len = len(X[i])
+                weights = np.array([1 / abs(j) if j != 0 else 0 for j in range(-context_len//2, context_len//2+1) if j != 0])
 
-# Word prediction function
-def predict(context_words):
-    context_vec = sum(one_hot_matrix[word_to_index[word]] for word in context_words)
-    h = np.dot(context_vec, W1)
-    u = np.dot(h, W2)
-    y_pred = np.exp(u) / np.sum(np.exp(u))
-    return index_to_word[np.argmax(y_pred)]
+                softmax, hidden = self.forward(X[i], weights)
+                softmax[y[i]] -= 1  # Gradient of loss
 
-# Test prediction
-print("Predicted word:", predict(["i","like","learning","i"]))
+                # Update weights
+                self.W2 -= lr * np.outer(hidden, softmax)
+                for idx, weight in zip(X[i], weights):  # Weighted update for each context word
+                    self.W1[idx] -= lr * weight * softmax @ self.W2.T / len(X[i])
+
+    def predict(self, context, word_to_idx, idx_to_word):
+        idx = [word_to_idx[word] for word in context]
+        weights = np.array([1 / abs(j) if j != 0 else 0 for j in range(-len(idx)//2, len(idx)//2+1) if j != 0])
+        softmax, _ = self.forward(idx, weights)
+        return idx_to_word[np.argmax(softmax)]
+
+# Usage
+corpus = ["open source is amazing", "I love open source projects"]
+window_size = 2
+X, y, word_to_idx, idx_to_word = prepare_data(corpus, window_size)
+model = CBOW(len(word_to_idx), embed_dim=50)
+model.train(X, y)
+
+# Prediction test
+print("Predicted word:", model.predict(["open", "source", "amazing", "I"], word_to_idx, idx_to_word))
