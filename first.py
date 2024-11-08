@@ -1,32 +1,61 @@
-import numpy as np
+# Import necessary packages
+import tensorflow as tf
+from tensorflow import keras
 import matplotlib.pyplot as plt
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
-from tensorflow.keras.optimizers import SGD
-from tensorflow.keras.datasets import mnist
-from tensorflow.keras.utils import to_categorical
-
-# Load and preprocess data
-(X_train, Y_train), (X_test, Y_test) = mnist.load_data()
-X_train, X_test = X_train.reshape(-1, 784) / 255.0, X_test.reshape(-1, 784) / 255.0
-Y_train, Y_test = to_categorical(Y_train, 10), to_categorical(Y_test, 10)
-# Define the model
-model = Sequential([
-Dense(128, input_shape=(784,), activation='sigmoid'),
-Dense(64, activation='sigmoid'),
-Dense(10, activation='softmax')
+import random
+# Load the MNIST dataset (handwritten digits)
+mnist = tf.keras.datasets.mnist
+(x_train, y_train), (x_test, y_test) = mnist.load_data()
+# Normalize the data to range [0, 1]
+x_train = x_train / 255.0
+x_test = x_test / 255.0
+# Define the network architecture
+# Sequential model with layers specified in sequence
+model = keras.Sequential([
+keras.layers.Flatten(input_shape=(28, 28)), # Flatten layer to reshape input to a 1D array
+keras.layers.Dense(128, activation="relu"), # Dense layer with 128 units and ReLU activation
+keras.layers.Dense(10, activation="softmax") # Output layer with 10 units for 10 classes (0-9)
 ])
-# Compile and train the model
-model.compile(optimizer=SGD(0.01), loss='categorical_crossentropy', metrics=['accuracy'])
-history = model.fit(X_train, Y_train, validation_data=(X_test, Y_test), epochs=10, batch_size=128)
-
-# Evaluate and plot
-print(f"Test accuracy: {model.evaluate(X_test, Y_test)[1]:.4f}")
-plt.plot(history.history['loss'], label='Train Loss')
-plt.plot(history.history['val_loss'], label='Val Loss')
-plt.plot(history.history['accuracy'], label='Train Accuracy')
-plt.plot(history.history['val_accuracy'], label='Val Accuracy')
-plt.legend()
+# Display the model architecture summary
+model.summary()
+# Compile the model with SGD optimizer and sparse categorical crossentropy loss
+model.compile(optimizer="sgd",
+loss="sparse_categorical_crossentropy",
+metrics=['accuracy'])
+# Train the model on training data with validation on test data for 3 epochs
+history = model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=3)
+# Evaluate the model on test data and print test loss and accuracy
+test_loss, test_acc = model.evaluate(x_test, y_test)
+print("Loss = %.3f" % test_loss)
+print("Accuracy = %.3f" % test_acc)
+# Select a random image from the test set
+n = random.randint(0, len(x_test) - 1)
+# Display the randomly selected test image
+plt.imshow(x_test[n], cmap='gray')
+plt.title(f"Actual Label: {y_test[n]}")
 plt.show()
-#making the predictin
-predictions=model.predict(X_test,batch_size=128)
+# Predict the class probabilities for the entire test set
+predicted_values = model.predict(x_test)
+# Display the selected test image again
+plt.imshow(x_test[n], cmap='gray')
+plt.show()
+# Print the predicted class for the selected test image
+print('Predicted Value:', predicted_values[n].argmax())
+# Plot training and validation accuracy over epochs
+plt.plot(history.history['accuracy'])
+plt.plot(history.history['val_accuracy'])
+plt.ylabel('Accuracy')
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Validation'], loc='upper right')
+plt.title("Training and Validation Accuracy")
+plt.show()
+# Plot training and validation loss over epochs
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.ylabel('Loss')
+
+
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Validation'], loc='upper right')
+plt.title("Training and Validation Loss")
+plt.show()
